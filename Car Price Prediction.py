@@ -10,7 +10,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 # -----------------------
 # Load model & data safely
 # -----------------------
-MODEL_FILE = "Car Price Prediction.pkl"
+MODEL_FILE = "car_price_prediction.pkl"
 
 @st.cache_resource
 def load_model():
