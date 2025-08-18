@@ -15,8 +15,7 @@ def load_data():
 
 @st.cache_resource
 def load_pipeline():
-    # This pipeline includes all preprocessing steps + trained model
-    return joblib.load("car_price_pipeline.pkl")
+    return joblib.load("car_price_pipeline.pkl")  # full pipeline with preprocess + model
 
 df = load_data()
 pipeline = load_pipeline()
@@ -35,10 +34,10 @@ tabs = st.tabs([
 with tabs[0]:
     st.title("Car Price Prediction App 🚗")
     st.image(
-      'https://images.unsplash.com/photo-1485463613374-7c9c9233c1a5?auto=format&fit=crop&w=800&q=80',
-      use_container_width=True)
+        'https://images.unsplash.com/photo-1485463613374-7c9c9233c1a5?auto=format&fit=crop&w=800&q=80',
+        use_container_width=True)
     st.markdown(
-        "Explore, analyze, and predict used car prices easily through this interactive app."
+        "Explore, analyze, and predict used car prices. Use the tabs above for rich insights and prediction."
     )
 
 # DATA EXPLORER
@@ -130,7 +129,7 @@ with tabs[3]:
         ax.set_xlabel("Present Price")
         ax.set_ylabel("Selling Price")
         ax.legend()
-        st.subheader("Outlier Identification in Price vs Present Price")
+        st.subheader("Outlier Identification")
         st.pyplot(fig)
     except Exception as e:
         st.error(f"Error rendering outlier detection: {e}")
@@ -143,7 +142,7 @@ with tabs[3]:
 
         fig, ax = plt.subplots()
         sns.scatterplot(x='Present_Price', y='Selling_Price', hue='Cluster', data=cluster_data, palette='Set1', ax=ax)
-        st.subheader("KMeans Clustering on Present Price & Selling Price")
+        st.subheader("KMeans Clustering")
         st.pyplot(fig)
     except Exception as e:
         st.error(f"Error rendering clustering: {e}")
@@ -163,9 +162,9 @@ with tabs[4]:
             st.bar_chart(fi_df.set_index('Feature'))
             st.dataframe(fi_df, use_container_width=True)
         else:
-            st.info("Feature importance not available for this model type.")
+            st.info("Feature importance is not available for this model.")
     except Exception as e:
-        st.error(f"Error showing feature importances: {e}")
+        st.error(f"Feature importance error: {e}")
 
 # MODEL EVALUATION
 with tabs[5]:
@@ -175,24 +174,24 @@ with tabs[5]:
         y = df['Selling_Price']
         preds = pipeline.predict(X)
         st.metric("R² Score", f"{r2_score(y, preds):.3f}")
-        st.metric("Mean Absolute Error", f"{mean_absolute_error(y, preds):.3f}")
-        st.metric("Root Mean Squared Error", f"{mean_squared_error(y, preds, squared=False):.3f}")
+        st.metric("MAE", f"{mean_absolute_error(y, preds):.3f}")
+        st.metric("RMSE", f"{mean_squared_error(y, preds, squared=False):.3f}")
 
         fig, ax = plt.subplots()
         ax.scatter(y, preds, alpha=0.6)
-        ax.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
-        ax.set_xlabel("Actual Selling Price")
-        ax.set_ylabel("Predicted Selling Price")
-        ax.set_title("Actual vs Predicted")
+        ax.plot([y.min(), y.max()], [y.min(), y.max()], "r--")
+        ax.set_xlabel("Actual")
+        ax.set_ylabel("Predicted")
+        ax.set_title("Actual vs Predicted Selling Price")
         st.pyplot(fig)
 
         fig, ax = plt.subplots()
         residuals = y - preds
         sns.histplot(residuals, bins=30, kde=True, color="purple", ax=ax)
-        ax.set_title("Residuals Distribution")
+        ax.set_title("Residual Distribution")
         st.pyplot(fig)
     except Exception as e:
-        st.error(f"Error during model evaluation: {e}")
+        st.error(f"Model evaluation error: {e}")
 
 # PREDICTION TAB
 with tabs[6]:
@@ -221,7 +220,7 @@ with tabs[6]:
             'Owner': owner
         }])
         try:
-            pred_price = pipeline.predict(user_input)[0]
-            st.success(f"Estimated Selling Price: ₹ {pred_price:.2f} Lakh")
+            prediction = pipeline.predict(user_input)[0]
+            st.success(f"Estimated Selling Price: ₹ {prediction:.2f} Lakh")
         except Exception as e:
-            st.error(f"Prediction failed. Confirm your input matches training data format. Error: {e}")
+            st.error(f"Prediction failed: {e}")
