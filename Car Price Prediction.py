@@ -10,7 +10,7 @@ st.set_page_config(page_title="Car Price Prediction", page_icon="🚗", layout="
 # Load data & model
 @st.cache_data
 def load_data():
-    df = pd.read_csv("C://Users//srivalli sana//Downloads//car data.csv")
+    df = pd.read_csv("car data.csv")
     return df
 
 @st.cache_resource
