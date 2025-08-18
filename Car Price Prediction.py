@@ -1,96 +1,120 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import pickle
+import joblib
 import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Load the model
-try:
-    model = pickle.load(open("car_price_model.pkl", "rb"))
-except Exception as e:
-    st.error(f"Model loading failed: {e}")
-    st.stop()
+st.set_page_config(page_title="Car Price Prediction", page_icon="🚗", layout="wide")
 
-# Load the dataset
-try:
-    df = pd.read_csv("car_data.csv")
-except Exception as e:
-    st.error(f"Dataset loading failed: {e}")
-    st.stop()
+@st.cache_data
+def load_data():
+    return pd.read_csv("car data.csv")
 
-# Ensure consistent data types
-df['Car_Name'] = df['Car_Name'].astype(str)
+@st.cache_resource
+def load_model():
+    return joblib.load("car_price_prediction.pkl")
 
-# App layout
-st.set_page_config(page_title="Car Price Prediction", layout="wide")
-st.title("🚗 Car Price Prediction App")
+df = load_data()
+model = load_model()
 
-# Sidebar navigation
-tabs = ["Home", "Data Preview", "Feature Importance", "Predict Price"]
-selected_tab = st.sidebar.radio("Navigate", tabs)
+tabs = st.tabs(["🏠 Home", "📊 Data Trends", "🤖 Feature Importance", "🔮 Prediction"])
 
-# Home Tab
-if selected_tab == "Home":
-    st.header("Welcome!")
+with tabs[0]:
+    st.title("Car Price Prediction App 🚗")
     st.markdown("""
-        This app predicts the **selling price** of a used car based on its features.
-        Navigate through the tabs to explore data, understand feature importance, and make predictions.
-    """)
+        <style>
+        .big-font {font-size:22px; font-weight:600;}
+        </style>
+        <div class="big-font">Welcome! Explore, analyze and predict used car prices.<br>
+        Use the tabs above for Data Trends and Price Prediction.
+        </div>
+    """, unsafe_allow_html=True)
+    st.image('https://images.unsplash.com/photo-1485463613374-7c9c9233dbd9?auto=format&fit=crop&w=800&q=80', use_container_width=True)
+    st.write("This app allows you to:")
+    st.markdown("- View trends in the dataset")
+    st.markdown("- Predict selling prices for used cars")
 
-# Data Preview Tab
-elif selected_tab == "Data Preview":
-    st.header("📊 Dataset Preview")
-    st.dataframe(df, use_container_width=True)
+with tabs[1]:
+    st.header("Car Data Trends")
+    st.subheader("Top 10 Popular Car Models")
+    top_cars = df['Car_Name'].value_counts().head(10)
+    st.bar_chart(top_cars)
 
-# Feature Importance Tab
-elif selected_tab == "Feature Importance":
-    st.header("📈 Feature Importance")
+    st.subheader("Average Selling Price by Fuel Type")
+    avg_price_fuel = df.groupby('Fuel_Type')['Selling_Price'].mean()
+    st.table(avg_price_fuel)
+
+    st.subheader("Yearly Trends of Average Selling Prices")
+    fig, ax = plt.subplots()
+    yearly_avg = df.groupby('Year')['Selling_Price'].mean()
+    ax.plot(yearly_avg.index, yearly_avg.values, marker='o')
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Average Selling Price (Lakh)")
+    st.pyplot(fig)
+
+    st.subheader("Distribution of Selling Prices")
+    fig, ax = plt.subplots()
+    sns.histplot(df["Selling_Price"], bins=30, color='skyblue', ax=ax)
+    st.pyplot(fig)
+
+with tabs[2]:
+    st.header("Feature Importance")
     try:
+        # Get the expected number of features from model input or training process
+        # Here assuming you have a list or pipeline used at training; adjust accordingly
+        feature_names = list(df.drop(columns=['Selling_Price']).columns)
+
         importances = model.feature_importances_
-        feature_names = df.drop(columns=["Selling_Price"]).columns.tolist()
+        
+        # If lengths mismatch, trim or warn
+        if len(feature_names) != len(importances):
+            st.warning(f"Feature names ({len(feature_names)}) and importances ({len(importances)}) length mismatch. Showing truncated results.")
+            min_len = min(len(feature_names), len(importances))
+            feature_names = feature_names[:min_len]
+            importances = importances[:min_len]
 
-        if len(importances) == len(feature_names):
-            fi_df = pd.DataFrame({
-                'Feature': feature_names,
-                'Importance': importances
-            }).sort_values('Importance', ascending=False)
+        fi_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': importances
+        }).sort_values(by='Importance', ascending=False)
 
-            st.bar_chart(fi_df.set_index('Feature'))
-            st.dataframe(fi_df, use_container_width=True)
-        else:
-            st.error("Mismatch between model features and dataset columns.")
-    except AttributeError:
-        st.warning("Feature importance not available for this model.")
+        st.bar_chart(fi_df.set_index('Feature'))
+        st.dataframe(fi_df, use_container_width=True)
 
-# Predict Price Tab
-elif selected_tab == "Predict Price":
-    st.header("🔮 Predict Car Selling Price")
+    except Exception as e:
+        st.error(f"Could not display feature importance: {e}")
 
-    # Input fields
-    car_name = st.selectbox("Car Name", df['Car_Name'].unique())
-    year = st.slider("Year of Purchase", 1990, 2025, 2015)
-    present_price = st.number_input("Present Price (in lakhs)", min_value=0.0, step=0.1)
-    kms_driven = st.number_input("Kilometers Driven", min_value=0, step=100)
-    fuel_type = st.selectbox("Fuel Type", ["Petrol", "Diesel", "CNG"])
-    seller_type = st.selectbox("Seller Type", ["Dealer", "Individual"])
-    transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
-    owner = st.selectbox("Owner Count", [0, 1, 2, 3])
+with tabs[3]:
+    st.header("Predict Selling Price")
 
-    # Feature engineering
-    car_age = 2025 - year
-    fuel_type_petrol = 1 if fuel_type == "Petrol" else 0
-    fuel_type_diesel = 1 if fuel_type == "Diesel" else 0
-    seller_type_individual = 1 if seller_type == "Individual" else 0
-    transmission_manual = 1 if transmission == "Manual" else 0
+    with st.form(key='predict_form'):
+        col1, col2 = st.columns(2)
+        car_name = col1.selectbox('Car Name', sorted(df['Car_Name'].unique()))
+        year = col2.number_input('Year', min_value=1990, max_value=2025, value=2015)
+        present_price = col1.number_input('Present Price (Lakh)', min_value=0.0, value=5.0)
+        driven_kms = col2.number_input('Driven Kms', min_value=0, value=15000)
+        fuel_type = col1.selectbox('Fuel Type', ['Petrol', 'Diesel', 'CNG'])
+        selling_type = col2.selectbox('Seller Type', ['Dealer', 'Individual'])
+        transmission = col1.selectbox('Transmission', ['Manual', 'Automatic'])
+        owner = col2.selectbox('Number of Owners', [0, 1, 2, 3])
 
-    input_data = np.array([[present_price, kms_driven, owner, car_age,
-                            fuel_type_diesel, fuel_type_petrol,
-                            seller_type_individual, transmission_manual]])
+        submitted = st.form_submit_button('Predict Price')
 
-    # Prediction
-    if st.button("Predict Price"):
-        try:
-            prediction = model.predict(input_data)[0]
-            st.success(f"Estimated Selling Price: ₹ {prediction:.2f} lakhs")
-        except Exception as e:
-            st.error(f"Prediction failed: {e}")
+    if submitted:
+        input_dict = {
+            'Car_Name': car_name,
+            'Year': year,
+            'Present_Price': present_price,
+            'Driven_kms': driven_kms,
+            'Fuel_Type': fuel_type,
+            'Selling_type': selling_type,
+            'Transmission': transmission,
+            'Owner': owner
+        }
+
+        input_df = pd.DataFrame([input_dict])
+
+        # Note: If your model needs preprocessing (encoding/scaling), prepare accordingly.
+        prediction = model.predict(input_df)[0]
+        st.success(f"Estimated Selling Price: ₹ {prediction:.2f} Lakh")
