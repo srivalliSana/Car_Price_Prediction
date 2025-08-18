@@ -1,21 +1,54 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import joblib
+import os
 import matplotlib.pyplot as plt
 import seaborn as sns
-import joblib
 from sklearn.metrics import r2_score, mean_squared_error
 
 # -----------------------
-# Load model & data
+# Load model & data safely
 # -----------------------
 @st.cache_resource
 def load_model():
-    return joblib.load("car_price_model.pkl")  # your trained model file
+    if os.path.exists("Car Price Prediction.pkl"):
+        return joblib.load("Car Price Prediction.pkl")
+    else:
+        st.warning("⚠️ Model file not found. Using fallback dummy model.")
+        from sklearn.linear_model import LinearRegression
+        dummy_df = pd.DataFrame({
+            "Year": [2015, 2016, 2017],
+            "Present_Price": [5.5, 7.0, 9.0],
+            "Driven_kms": [50000, 30000, 20000],
+            "Fuel_Type": [0, 1, 0],
+            "Selling_type": [0, 1, 0],
+            "Transmission": [0, 1, 0],
+            "Owner": [0, 0, 0],
+            "Selling_Price": [3.5, 5.0, 6.5]
+        })
+        X = dummy_df.drop("Selling_Price", axis=1)
+        y = dummy_df["Selling_Price"]
+        model = LinearRegression().fit(X, y)
+        return model
 
 @st.cache_data
 def load_data():
-    return pd.read_csv("car_data.csv")  # your dataset
+    if os.path.exists("car data.csv"):
+        return pd.read_csv("car data.csv")
+    else:
+        st.warning("⚠️ Dataset not found. Using fallback data.")
+        return pd.DataFrame({
+            "Car_Name": ["Swift", "Innova", "City"],
+            "Year": [2015, 2017, 2018],
+            "Present_Price": [5.5, 12.0, 9.5],
+            "Driven_kms": [50000, 30000, 20000],
+            "Fuel_Type": ["Petrol", "Diesel", "Petrol"],
+            "Selling_type": ["Dealer", "Individual", "Dealer"],
+            "Transmission": ["Manual", "Automatic", "Manual"],
+            "Owner": [0, 0, 0],
+            "Selling_Price": [3.5, 7.0, 5.5]
+        })
 
 model = load_model()
 df = load_data()
@@ -35,7 +68,7 @@ page = st.sidebar.radio(
 
 if page == "Home":
     st.title("🚘 Car Price Prediction App")
-    st.write("Welcome! Use the sidebar to navigate through the app.")
+    st.write("Welcome! Use the sidebar to explore the app.")
 
 elif page == "Dataset":
     st.header("📂 Dataset Preview")
@@ -53,22 +86,20 @@ elif page == "Predict":
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
     owner = st.selectbox("Owner", [0, 1, 2, 3])
 
-    # Encoding (must match training)
-    fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
-    selling_map = {"Dealer": 0, "Individual": 1}
-    transmission_map = {"Manual": 0, "Automatic": 1}
+    # Encoding
+    fuel_dict = {"Petrol": 0, "Diesel": 1, "CNG": 2}
+    selling_dict = {"Dealer": 0, "Individual": 1}
+    trans_dict = {"Manual": 0, "Automatic": 1}
 
-    input_data = {
-        "Year": [year],
-        "Present_Price": [present_price],
-        "Driven_kms": [driven_kms],
-        "Fuel_Type": [fuel_map[fuel_type]],
-        "Selling_type": [selling_map[selling_type]],
-        "Transmission": [transmission_map[transmission]],
-        "Owner": [owner]
-    }
-
-    input_df = pd.DataFrame(input_data)
+    input_df = pd.DataFrame([{
+        "Year": year,
+        "Present_Price": present_price,
+        "Driven_kms": driven_kms,
+        "Fuel_Type": fuel_dict[fuel_type],
+        "Selling_type": selling_dict[selling_type],
+        "Transmission": trans_dict[transmission],
+        "Owner": owner
+    }])
 
     if st.button("Predict Price"):
         try:
@@ -78,35 +109,23 @@ elif page == "Predict":
             st.error(f"Prediction failed: {e}")
 
 elif page == "Model Performance":
-    st.header("📉 Model Performance")
+    st.header("📊 Model Performance")
 
-    # Prepare features & target
-    X = df.drop(["Selling_Price", "Car_Name"], axis=1).copy()
-    y = df["Selling_Price"]
+    try:
+        X = df.drop(["Selling_Price", "Car_Name"], axis=1)
+        y = df["Selling_Price"]
+        preds = model.predict(X)
+        r2 = r2_score(y, preds)
+        mse = mean_squared_error(y, preds)
 
-    # Encode
-    fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
-    selling_map = {"Dealer": 0, "Individual": 1}
-    transmission_map = {"Manual": 0, "Automatic": 1}
+        st.write(f"**R² Score:** {r2:.2f}")
+        st.write(f"**MSE:** {mse:.2f}")
 
-    X["Fuel_Type"] = X["Fuel_Type"].map(fuel_map)
-    X["Selling_type"] = X["Selling_type"].map(selling_map)
-    X["Transmission"] = X["Transmission"].map(transmission_map)
-
-    # Predict
-    y_pred = model.predict(X)
-
-    # Metrics
-    r2 = r2_score(y, y_pred)
-    mse = mean_squared_error(y, y_pred)
-
-    st.write(f"**R² Score:** {r2:.3f}")
-    st.write(f"**Mean Squared Error:** {mse:.3f}")
-
-    # Plot
-    fig, ax = plt.subplots()
-    sns.scatterplot(x=y, y=y_pred, ax=ax)
-    ax.set_xlabel("Actual Price")
-    ax.set_ylabel("Predicted Price")
-    ax.set_title("Actual vs Predicted")
-    st.pyplot(fig)
+        fig, ax = plt.subplots()
+        sns.scatterplot(x=y, y=preds, ax=ax)
+        ax.set_xlabel("Actual Price")
+        ax.set_ylabel("Predicted Price")
+        ax.set_title("Actual vs Predicted")
+        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Could not evaluate model: {e}")
