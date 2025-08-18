@@ -109,55 +109,76 @@ elif st.session_state.page == "EDA":
 
 # --- Predict ---
 elif st.session_state.page == "Predict":
-    st.subheader("🎯 Predict Car Price")
+    st.header("🎯 Car Price Prediction")
 
-    car_name = st.text_input("Car Name", "Hyundai i20")  # kept for consistency
-    year = st.number_input("Year", min_value=1990, max_value=2025, value=2015)
+    # User inputs
+    year = st.number_input("Year", min_value=1990, max_value=2025, step=1, value=2015)
     present_price = st.number_input("Present Price (in lakhs)", min_value=0.0, step=0.1)
-    kms_driven = st.number_input("Driven kms", min_value=0, step=500)
+    driven_kms = st.number_input("Driven KMs", min_value=0, step=500)
     fuel_type = st.selectbox("Fuel Type", ["Petrol", "Diesel", "CNG"])
-    selling_type = st.selectbox("Selling type", ["Dealer", "Individual"])
+    selling_type = st.selectbox("Selling Type", ["Dealer", "Individual"])
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
     owner = st.selectbox("Owner", [0, 1, 2, 3])
 
-    input_df = pd.DataFrame([{
-        "Car_Name": car_name,
-        "Year": year,
-        "Present_Price": present_price,
-        "Driven_kms": kms_driven,
-        "Fuel_Type": fuel_type,
-        "Selling_type": selling_type,
-        "Transmission": transmission,
-        "Owner": owner
-    }])
+    # Encoding categorical variables (must match training!)
+    fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
+    selling_map = {"Dealer": 0, "Individual": 1}
+    transmission_map = {"Manual": 0, "Automatic": 1}
+
+    input_data = {
+        "Year": [year],
+        "Present_Price": [present_price],
+        "Driven_kms": [driven_kms],
+        "Fuel_Type": [fuel_map[fuel_type]],
+        "Selling_type": [selling_map[selling_type]],
+        "Transmission": [transmission_map[transmission]],
+        "Owner": [owner]
+    }
+
+    input_df = pd.DataFrame(input_data)
 
     if st.button("Predict Price"):
-        prediction = model.predict(input_df)[0]
-        st.success(f"💰 Predicted Selling Price: **{round(prediction, 2)} lakhs**")
+        try:
+            prediction = model.predict(input_df)[0]
+            st.success(f"💰 Predicted Selling Price: {prediction:.2f} lakhs")
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
+
 
 # --- Model Performance ---
 elif st.session_state.page == "Model Performance":
-    st.subheader("📉 Model Performance")
+    st.header("📉 Model Performance")
 
-    X = data.drop("Selling_Price", axis=1)
-    y = data["Selling_Price"]
+    # Separate features and target
+    X = df.drop(["Selling_Price", "Car_Name"], axis=1).copy()
+    y = df["Selling_Price"]
 
-    preds = model.predict(X)
+    # Encode categorical variables
+    fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
+    selling_map = {"Dealer": 0, "Individual": 1}
+    transmission_map = {"Manual": 0, "Automatic": 1}
 
-    r2 = r2_score(y, preds)
-    rmse = np.sqrt(mean_squared_error(y, preds))
+    X["Fuel_Type"] = X["Fuel_Type"].map(fuel_map)
+    X["Selling_type"] = X["Selling_type"].map(selling_map)
+    X["Transmission"] = X["Transmission"].map(transmission_map)
 
-    st.write(f"**R² Score:** {r2:.2f}")
-    st.write(f"**RMSE:** {rmse:.2f}")
+    # Predictions
+    y_pred = model.predict(X)
 
-    # Actual vs Predicted plot
+    r2 = r2_score(y, y_pred)
+    mse = mean_squared_error(y, y_pred)
+
+    st.write(f"**R² Score:** {r2:.3f}")
+    st.write(f"**Mean Squared Error:** {mse:.3f}")
+
+    # Plot actual vs predicted
     fig, ax = plt.subplots()
-    ax.scatter(y, preds, alpha=0.6)
-    ax.plot([0, max(y)], [0, max(y)], 'r--')
+    sns.scatterplot(x=y, y=y_pred, ax=ax)
     ax.set_xlabel("Actual Price")
     ax.set_ylabel("Predicted Price")
     ax.set_title("Actual vs Predicted")
     st.pyplot(fig)
+
 
 # --- About ---
 elif st.session_state.page == "About":
