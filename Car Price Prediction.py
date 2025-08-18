@@ -10,27 +10,30 @@ from sklearn.metrics import r2_score, mean_squared_error
 # -----------------------
 # Load model & data safely
 # -----------------------
+MODEL_FILE = "Car Price Prediction.pkl"
+
 @st.cache_resource
 def load_model():
-    if os.path.exists("Car Price Prediction.pkl"):
-        return joblib.load("Car Price Prediction.pkl")
+    if os.path.exists(MODEL_FILE):
+        return joblib.load(MODEL_FILE)
     else:
         st.warning("⚠️ Model file not found. Using fallback dummy model.")
         from sklearn.linear_model import LinearRegression
+        import pandas as pd
         dummy_df = pd.DataFrame({
-            "Year": [2015, 2016, 2017],
-            "Present_Price": [5.5, 7.0, 9.0],
-            "Driven_kms": [50000, 30000, 20000],
-            "Fuel_Type": [0, 1, 0],
-            "Selling_type": [0, 1, 0],
-            "Transmission": [0, 1, 0],
-            "Owner": [0, 0, 0],
-            "Selling_Price": [3.5, 5.0, 6.5]
+            "Year": [2015, 2016],
+            "Present_Price": [5, 7],
+            "Driven_kms": [50000, 30000],
+            "Fuel_Type": [0, 1],
+            "Selling_type": [0, 1],
+            "Transmission": [0, 1],
+            "Owner": [0, 0],
+            "Selling_Price": [3.5, 5.0]
         })
         X = dummy_df.drop("Selling_Price", axis=1)
         y = dummy_df["Selling_Price"]
-        model = LinearRegression().fit(X, y)
-        return model
+        return LinearRegression().fit(X, y)
+
 
 @st.cache_data
 def load_data():
