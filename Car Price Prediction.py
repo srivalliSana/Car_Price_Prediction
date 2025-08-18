@@ -55,7 +55,8 @@ with tabs[1]:
     fig, ax = plt.subplots()
     yearly_price = df.groupby('Year')['Selling_Price'].mean()
     ax.plot(yearly_price.index, yearly_price.values, marker='o')
-    ax.set_xlabel("Year"); ax.set_ylabel("Avg Selling Price (Lakh)");
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Avg Selling Price (Lakh)")
     st.pyplot(fig)
 
     st.subheader("Distribution of Selling Prices")
@@ -66,11 +67,11 @@ with tabs[1]:
 # ----- PREDICTION TAB -----
 with tabs[2]:
     st.header("🔮 Predict Your Car's Selling Price")
-
     # User input form
     st.subheader("Enter Car Details:")
     form = st.form(key='predict_form')
     col1, col2 = form.columns(2)
+
     car_name = col1.selectbox('Car Name', sorted(df['Car_Name'].unique()))
     year = col2.number_input('Year', min_value=1990, max_value=2025, value=2018)
     present_price = col1.number_input('Present Price (Lakh)', min_value=0.0, value=5.0)
@@ -79,45 +80,23 @@ with tabs[2]:
     selling_type = col2.selectbox('Seller Type', ['Dealer', 'Individual'])
     transmission = col1.selectbox('Transmission', ['Manual', 'Automatic'])
     owner = col2.selectbox('Owner', [0, 1, 2, 3])
+
     submit = form.form_submit_button('✅ Predict Price')
 
     if submit:
         # Feature engineering (replicate what your model expects!)
-        input_dict = {'Car_Name': car_name,
-                      'Year': year,
-                      'Present_Price': present_price,
-                      'Driven_kms': driven_kms,
-                      'Fuel_Type': fuel_type,
-                      'Selling_type': selling_type,
-                      'Transmission': transmission,
-                      'Owner': owner}
-        # If your model expects encoded inputs, use your pipeline or manual encoding here
+        input_dict = {
+            'Car_Name': car_name,
+            'Year': year,
+            'Present_Price': present_price,
+            'Driven_kms': driven_kms,
+            'Fuel_Type': fuel_type,
+            'Selling_type': selling_type,
+            'Transmission': transmission,
+            'Owner': owner
+        }
+        # If your model expects encoded inputs, apply your pipeline or manual encoding here
         input_df = pd.DataFrame([input_dict])
         sell_price = model.predict(input_df)[0]
         st.success(f"Estimated Selling Price: ₹ {sell_price:.2f} Lakh")
-
         st.info("Note: Prediction accuracy depends on feature processing and your model quality.")
-
----
-
-## How does this app work?
-
-- Uses **streamlit tabs** (with icons: Home, Data Trends, Prediction).
-- Each tab is a different part of the app—no dropdown/select menu needed for navigation.
-- Home page introduces your app. Data Trends shows charts, tables, and analysis on your dataset. Prediction lets users enter car details and get predicted price.
-- Visually appealing and interactive.
-
----
-
-## How to write advanced Streamlit navigation apps
-
-1. **Use tabs or multipage (`st.tabs()`, not only sidebar) for a modern navigation feel**
-2. **Add icons/emojis** to tab names for friendly UX
-3. **Split each function (intro, analysis, prediction) into its own tab/page**
-4. **Include charts, tables, and images to enrich user experience**
-5. **Always keep your input features and model preprocessing consistent**
-6. **Make your interface interactive and clean**
-
----
-
-Let me know if you want to add more pages (like uploading a CSV, batch predictions, feature explanations, etc.) or customize the visual theme!
