@@ -57,12 +57,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Navbar with icons (using emojis for simplicity)
+# Navbar with icons (using emojis)
 nav_items = {
     "Dataset": "📊",
     "EDA": "📈",
-    "Features": "⚡",
-    "Predict": "💰"
+    "Predict": "💰",
+    "Model Perf": "📊",
+    "About": "ℹ️"
 }
 
 # Store selection in session_state
@@ -117,24 +118,6 @@ elif st.session_state.page == "EDA":
     st.pyplot(plt.gcf())
 
 # =========================
-# Feature Importance
-# =========================
-elif st.session_state.page == "Features":
-    st.subheader("⚡ Feature Importance")
-
-    if hasattr(model, "feature_importances_"):
-        importance = model.feature_importances_
-        features = df.drop("Selling_Price", axis=1).columns
-        imp_df = pd.DataFrame({"Feature": features, "Importance": importance})
-        imp_df = imp_df.sort_values(by="Importance", ascending=False)
-
-        plt.figure(figsize=(10,6))
-        sns.barplot(x="Importance", y="Feature", data=imp_df, palette="magma")
-        st.pyplot(plt.gcf())
-    else:
-        st.warning("Model does not provide feature importance.")
-
-# =========================
 # Price Prediction
 # =========================
 elif st.session_state.page == "Predict":
@@ -149,7 +132,7 @@ elif st.session_state.page == "Predict":
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
     owner = st.selectbox("Owner", [0,1,2,3])
 
-    # Encode categorical variables (adjust mapping based on your notebook preprocessing)
+    # Encode categorical variables (adjust mapping based on preprocessing)
     fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
     seller_map = {"Dealer": 0, "Individual": 1}
     trans_map = {"Manual": 0, "Automatic": 1}
@@ -162,13 +145,37 @@ elif st.session_state.page == "Predict":
         st.success(f"💰 Predicted Selling Price: **{round(prediction, 2)} lakhs**")
 
 # =========================
-# Sidebar Model Performance
+# Model Performance
 # =========================
-st.sidebar.markdown("---")
-if st.sidebar.checkbox("Show Model Performance"):
+elif st.session_state.page == "Model Perf":
+    st.subheader("📊 Model Performance")
+
     X = df.drop("Selling_Price", axis=1, errors="ignore")
     y = df["Selling_Price"]
     y_pred = model.predict(X)
 
-    st.sidebar.write("📈 R² Score:", round(r2_score(y, y_pred), 3))
-    st.sidebar.write("📉 RMSE:", round(np.sqrt(mean_squared_error(y, y_pred)), 3))
+    st.write("📈 R² Score:", round(r2_score(y, y_pred), 3))
+    st.write("📉 RMSE:", round(np.sqrt(mean_squared_error(y, y_pred)), 3))
+
+    # Actual vs Predicted plot
+    plt.figure(figsize=(8,5))
+    sns.scatterplot(x=y, y=y_pred, alpha=0.7)
+    plt.xlabel("Actual Price")
+    plt.ylabel("Predicted Price")
+    plt.title("Actual vs Predicted Prices")
+    st.pyplot(plt.gcf())
+
+# =========================
+# About Section
+# =========================
+elif st.session_state.page == "About":
+    st.subheader("ℹ️ About This App")
+    st.markdown("""
+    This interactive web app was built using **Streamlit**.  
+    - 📊 Explore the car dataset  
+    - 📈 Perform exploratory data analysis  
+    - 💰 Predict car prices using a trained ML model  
+    - 📊 Check model performance  
+
+    **Created for learning & demonstration purposes 🚀**
+    """)
