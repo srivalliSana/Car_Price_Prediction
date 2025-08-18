@@ -44,6 +44,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Navbar items
+# Navbar items
 nav_items = {
     "Home": "🏠",
     "Dataset": "📊",
@@ -65,9 +66,11 @@ for page, icon in nav_items.items():
 nav_html += "</div>"
 st.markdown(nav_html, unsafe_allow_html=True)
 
-query_params = st.experimental_get_query_params()
+# ✅ Updated method
+query_params = st.query_params
 if "page" in query_params:
-    st.session_state.page = query_params["page"][0]
+    st.session_state.page = query_params["page"]
+
 
 # =========================
 # Pages
