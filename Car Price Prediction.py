@@ -1,114 +1,47 @@
 import streamlit as st
 import pandas as pd
-import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import joblib
 from sklearn.metrics import r2_score, mean_squared_error
 
-# =========================
-# Load model and dataset
-# =========================
-model = pickle.load(open("car_price_prediction.pkl", "rb"))
-data = pd.read_csv("car data.csv")
+# -----------------------
+# Load model & data
+# -----------------------
+@st.cache_resource
+def load_model():
+    return joblib.load("car_price_model.pkl")  # your trained model file
 
-# =========================
-# Custom CSS Navbar
-# =========================
-st.markdown("""
-    <style>
-    .navbar {
-        display: flex;
-        justify-content: space-around;
-        background-color: #0d6efd;
-        padding: 10px;
-        border-radius: 12px;
-        margin-bottom: 20px;
-    }
-    .navbar a {
-        text-decoration: none;
-        color: white;
-        font-weight: bold;
-        padding: 8px 15px;
-        border-radius: 8px;
-        transition: 0.3s;
-        font-size: 18px;
-    }
-    .navbar a:hover {
-        background-color: #084298;
-    }
-    .active {
-        background-color: #084298;
-    }
-    </style>
-""", unsafe_allow_html=True)
+@st.cache_data
+def load_data():
+    return pd.read_csv("car_data.csv")  # your dataset
 
-# Navbar items
-# Navbar items
-nav_items = {
-    "Home": "🏠",
-    "Dataset": "📊",
-    "EDA": "📈",
-    "Predict": "🎯",
-    "Model Performance": "📉",
-    "About": "ℹ️"
-}
+model = load_model()
+df = load_data()
 
-if "page" not in st.session_state:
-    st.session_state.page = "Home"
+# -----------------------
+# Sidebar Navigation
+# -----------------------
+st.sidebar.title("🚗 Car Price App")
+page = st.sidebar.radio(
+    "Go to",
+    ["Home", "Dataset", "Predict", "Model Performance"]
+)
 
-nav_html = '<div class="navbar">'
-for page, icon in nav_items.items():
-    if st.session_state.page == page:
-        nav_html += f'<a class="active" href="?page={page}">{icon} {page}</a>'
-    else:
-        nav_html += f'<a href="?page={page}">{icon} {page}</a>'
-nav_html += "</div>"
-st.markdown(nav_html, unsafe_allow_html=True)
-
-# ✅ Updated method
-query_params = st.query_params
-if "page" in query_params:
-    st.session_state.page = query_params["page"]
-
-
-# =========================
+# -----------------------
 # Pages
-# =========================
+# -----------------------
 
-# --- Home ---
-if st.session_state.page == "Home":
-    st.title("🚗 Car Price Prediction App")
-    st.write("Welcome! Use the navigation bar above to explore the app.")
+if page == "Home":
+    st.title("🚘 Car Price Prediction App")
+    st.write("Welcome! Use the sidebar to navigate through the app.")
 
-# --- Dataset ---
-elif st.session_state.page == "Dataset":
-    st.subheader("📊 Dataset Preview")
-    st.dataframe(data.head())
+elif page == "Dataset":
+    st.header("📂 Dataset Preview")
+    st.dataframe(df.head())
 
-    st.subheader("🔎 Data Info")
-    st.write(f"Rows: {data.shape[0]}, Columns: {data.shape[1]}")
-    st.write("Columns:", list(data.columns))
-
-# --- EDA ---
-elif st.session_state.page == "EDA":
-    st.subheader("📈 Exploratory Data Analysis")
-
-    # Distribution of Selling Price
-    fig, ax = plt.subplots()
-    sns.histplot(data["Selling_Price"], kde=True, ax=ax)
-    ax.set_title("Selling Price Distribution")
-    st.pyplot(fig)
-
-    # Correlation heatmap
-    fig, ax = plt.subplots(figsize=(8, 5))
-    corr = data.corr(numeric_only=True)
-    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
-    ax.set_title("Correlation Heatmap")
-    st.pyplot(fig)
-
-# --- Predict ---
-elif st.session_state.page == "Predict":
+elif page == "Predict":
     st.header("🎯 Car Price Prediction")
 
     # User inputs
@@ -120,7 +53,7 @@ elif st.session_state.page == "Predict":
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
     owner = st.selectbox("Owner", [0, 1, 2, 3])
 
-    # Encoding categorical variables (must match training!)
+    # Encoding (must match training)
     fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
     selling_map = {"Dealer": 0, "Individual": 1}
     transmission_map = {"Manual": 0, "Automatic": 1}
@@ -144,16 +77,14 @@ elif st.session_state.page == "Predict":
         except Exception as e:
             st.error(f"Prediction failed: {e}")
 
-
-# --- Model Performance ---
-elif st.session_state.page == "Model Performance":
+elif page == "Model Performance":
     st.header("📉 Model Performance")
 
-    # Separate features and target
+    # Prepare features & target
     X = df.drop(["Selling_Price", "Car_Name"], axis=1).copy()
     y = df["Selling_Price"]
 
-    # Encode categorical variables
+    # Encode
     fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
     selling_map = {"Dealer": 0, "Individual": 1}
     transmission_map = {"Manual": 0, "Automatic": 1}
@@ -162,33 +93,20 @@ elif st.session_state.page == "Model Performance":
     X["Selling_type"] = X["Selling_type"].map(selling_map)
     X["Transmission"] = X["Transmission"].map(transmission_map)
 
-    # Predictions
+    # Predict
     y_pred = model.predict(X)
 
+    # Metrics
     r2 = r2_score(y, y_pred)
     mse = mean_squared_error(y, y_pred)
 
     st.write(f"**R² Score:** {r2:.3f}")
     st.write(f"**Mean Squared Error:** {mse:.3f}")
 
-    # Plot actual vs predicted
+    # Plot
     fig, ax = plt.subplots()
     sns.scatterplot(x=y, y=y_pred, ax=ax)
     ax.set_xlabel("Actual Price")
     ax.set_ylabel("Predicted Price")
     ax.set_title("Actual vs Predicted")
     st.pyplot(fig)
-
-
-# --- About ---
-elif st.session_state.page == "About":
-    st.subheader("ℹ️ About this Project")
-    st.write("""
-    This Car Price Prediction App was built using:
-    - Streamlit (Frontend + Dashboard)
-    - Machine Learning (Regression Model)
-    - Exploratory Data Analysis (EDA)
-
-    🔹 You can explore the dataset, visualize trends, 
-    predict car prices, and evaluate model performance.
-    """)
