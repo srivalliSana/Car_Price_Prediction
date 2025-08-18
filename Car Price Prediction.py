@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import pickle
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import r2_score, mean_squared_error
@@ -9,18 +9,8 @@ from sklearn.metrics import r2_score, mean_squared_error
 # =========================
 # Load model and dataset
 # =========================
-@st.cache_data
-def load_data():
-    return pd.read_csv("car data.csv")
-
-@st.cache_resource
-def load_model():
-    return pickle.load(open("car_price_prediction.pkl", "rb"))
-
-df = load_data()
-model = load_model()
-
-st.set_page_config(page_title="Car Price Prediction App", layout="wide")
+model = pickle.load(open("car_price_prediction.pkl", "rb"))
+data = pd.read_csv("car data.csv")
 
 # =========================
 # Custom CSS Navbar
@@ -29,153 +19,152 @@ st.markdown("""
     <style>
     .navbar {
         display: flex;
-        justify-content: center;
-        background-color: #f8f9fa;
+        justify-content: space-around;
+        background-color: #0d6efd;
         padding: 10px;
-        border-radius: 10px;
+        border-radius: 12px;
         margin-bottom: 20px;
     }
-    .nav-item {
-        margin: 0 20px;
-        text-align: center;
-        cursor: pointer;
-        color: #555;
-        font-size: 16px;
+    .navbar a {
         text-decoration: none;
+        color: white;
+        font-weight: bold;
+        padding: 8px 15px;
+        border-radius: 8px;
+        transition: 0.3s;
+        font-size: 18px;
     }
-    .nav-item:hover {
-        color: #000;
-    }
-    .nav-icon {
-        font-size: 22px;
-        display: block;
+    .navbar a:hover {
+        background-color: #084298;
     }
     .active {
-        color: #4CAF50;
-        font-weight: bold;
+        background-color: #084298;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Navbar with icons (using emojis)
+# Navbar items
 nav_items = {
+    "Home": "🏠",
     "Dataset": "📊",
     "EDA": "📈",
-    "Predict": "💰",
-    "Model Perf": "📊",
+    "Predict": "🎯",
+    "Model Performance": "📉",
     "About": "ℹ️"
 }
 
-# Store selection in session_state
 if "page" not in st.session_state:
-    st.session_state.page = "Dataset"
+    st.session_state.page = "Home"
 
-# Render Navbar
-cols = st.columns(len(nav_items))
-for i, (page, icon) in enumerate(nav_items.items()):
-    if cols[i].button(f"{icon}\n{page}"):
-        st.session_state.page = page
+nav_html = '<div class="navbar">'
+for page, icon in nav_items.items():
+    if st.session_state.page == page:
+        nav_html += f'<a class="active" href="?page={page}">{icon} {page}</a>'
+    else:
+        nav_html += f'<a href="?page={page}">{icon} {page}</a>'
+nav_html += "</div>"
+st.markdown(nav_html, unsafe_allow_html=True)
 
-st.title("🚗 Car Price Prediction App")
-
-# =========================
-# Dataset Overview
-# =========================
-if st.session_state.page == "Dataset":
-    st.subheader("🔎 Dataset Preview")
-    st.dataframe(df.head())
-
-    st.write("**Shape of dataset:**", df.shape)
-    st.write("**Column Info:**")
-    st.write(df.dtypes)
-
-    st.write("**Summary Statistics:**")
-    st.write(df.describe())
+query_params = st.experimental_get_query_params()
+if "page" in query_params:
+    st.session_state.page = query_params["page"][0]
 
 # =========================
-# Exploratory Data Analysis
+# Pages
 # =========================
+
+# --- Home ---
+if st.session_state.page == "Home":
+    st.title("🚗 Car Price Prediction App")
+    st.write("Welcome! Use the navigation bar above to explore the app.")
+
+# --- Dataset ---
+elif st.session_state.page == "Dataset":
+    st.subheader("📊 Dataset Preview")
+    st.dataframe(data.head())
+
+    st.subheader("🔎 Data Info")
+    st.write(f"Rows: {data.shape[0]}, Columns: {data.shape[1]}")
+    st.write("Columns:", list(data.columns))
+
+# --- EDA ---
 elif st.session_state.page == "EDA":
-    st.subheader("📊 Exploratory Data Analysis")
-
-    # Correlation heatmap
-    st.write("### 🔥 Correlation Heatmap")
-    plt.figure(figsize=(10,6))
-    sns.heatmap(df.corr(numeric_only=True), annot=True, cmap="coolwarm")
-    st.pyplot(plt.gcf())
+    st.subheader("📈 Exploratory Data Analysis")
 
     # Distribution of Selling Price
-    st.write("### 💰 Distribution of Selling Price")
-    plt.figure(figsize=(8,5))
-    sns.histplot(df['Selling_Price'], kde=True, bins=30, color="blue")
-    st.pyplot(plt.gcf())
+    fig, ax = plt.subplots()
+    sns.histplot(data["Selling_Price"], kde=True, ax=ax)
+    ax.set_title("Selling Price Distribution")
+    st.pyplot(fig)
 
-    # Categorical analysis
-    cat_col = st.selectbox("Select Categorical Column to Analyze", df.select_dtypes("object").columns)
-    plt.figure(figsize=(8,5))
-    sns.countplot(data=df, x=cat_col, palette="viridis")
-    plt.xticks(rotation=45)
-    st.pyplot(plt.gcf())
+    # Correlation heatmap
+    fig, ax = plt.subplots(figsize=(8, 5))
+    corr = data.corr(numeric_only=True)
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+    ax.set_title("Correlation Heatmap")
+    st.pyplot(fig)
 
-# =========================
-# Price Prediction
-# =========================
+# --- Predict ---
 elif st.session_state.page == "Predict":
     st.subheader("🎯 Predict Car Price")
 
-    # Inputs
+    car_name = st.text_input("Car Name", "Hyundai i20")  # kept for consistency
     year = st.number_input("Year", min_value=1990, max_value=2025, value=2015)
     present_price = st.number_input("Present Price (in lakhs)", min_value=0.0, step=0.1)
-    kms_driven = st.number_input("Kms Driven", min_value=0, step=500)
+    kms_driven = st.number_input("Driven kms", min_value=0, step=500)
     fuel_type = st.selectbox("Fuel Type", ["Petrol", "Diesel", "CNG"])
-    seller_type = st.selectbox("Seller Type", ["Dealer", "Individual"])
+    selling_type = st.selectbox("Selling type", ["Dealer", "Individual"])
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
-    owner = st.selectbox("Owner", [0,1,2,3])
+    owner = st.selectbox("Owner", [0, 1, 2, 3])
 
-    # Encode categorical variables (adjust mapping based on preprocessing)
-    fuel_map = {"Petrol": 0, "Diesel": 1, "CNG": 2}
-    seller_map = {"Dealer": 0, "Individual": 1}
-    trans_map = {"Manual": 0, "Automatic": 1}
-
-    features = np.array([[present_price, kms_driven, owner, year, 
-                          fuel_map[fuel_type], seller_map[seller_type], trans_map[transmission]]])
+    input_df = pd.DataFrame([{
+        "Car_Name": car_name,
+        "Year": year,
+        "Present_Price": present_price,
+        "Driven_kms": kms_driven,
+        "Fuel_Type": fuel_type,
+        "Selling_type": selling_type,
+        "Transmission": transmission,
+        "Owner": owner
+    }])
 
     if st.button("Predict Price"):
-        prediction = model.predict(features)[0]
+        prediction = model.predict(input_df)[0]
         st.success(f"💰 Predicted Selling Price: **{round(prediction, 2)} lakhs**")
 
-# =========================
-# Model Performance
-# =========================
-elif st.session_state.page == "Model Perf":
-    st.subheader("📊 Model Performance")
+# --- Model Performance ---
+elif st.session_state.page == "Model Performance":
+    st.subheader("📉 Model Performance")
 
-    X = df.drop("Selling_Price", axis=1, errors="ignore")
-    y = df["Selling_Price"]
-    y_pred = model.predict(X)
+    X = data.drop("Selling_Price", axis=1)
+    y = data["Selling_Price"]
 
-    st.write("📈 R² Score:", round(r2_score(y, y_pred), 3))
-    st.write("📉 RMSE:", round(np.sqrt(mean_squared_error(y, y_pred)), 3))
+    preds = model.predict(X)
+
+    r2 = r2_score(y, preds)
+    rmse = np.sqrt(mean_squared_error(y, preds))
+
+    st.write(f"**R² Score:** {r2:.2f}")
+    st.write(f"**RMSE:** {rmse:.2f}")
 
     # Actual vs Predicted plot
-    plt.figure(figsize=(8,5))
-    sns.scatterplot(x=y, y=y_pred, alpha=0.7)
-    plt.xlabel("Actual Price")
-    plt.ylabel("Predicted Price")
-    plt.title("Actual vs Predicted Prices")
-    st.pyplot(plt.gcf())
+    fig, ax = plt.subplots()
+    ax.scatter(y, preds, alpha=0.6)
+    ax.plot([0, max(y)], [0, max(y)], 'r--')
+    ax.set_xlabel("Actual Price")
+    ax.set_ylabel("Predicted Price")
+    ax.set_title("Actual vs Predicted")
+    st.pyplot(fig)
 
-# =========================
-# About Section
-# =========================
+# --- About ---
 elif st.session_state.page == "About":
-    st.subheader("ℹ️ About This App")
-    st.markdown("""
-    This interactive web app was built using **Streamlit**.  
-    - 📊 Explore the car dataset  
-    - 📈 Perform exploratory data analysis  
-    - 💰 Predict car prices using a trained ML model  
-    - 📊 Check model performance  
+    st.subheader("ℹ️ About this Project")
+    st.write("""
+    This Car Price Prediction App was built using:
+    - Streamlit (Frontend + Dashboard)
+    - Machine Learning (Regression Model)
+    - Exploratory Data Analysis (EDA)
 
-    **Created for learning & demonstration purposes 🚀**
+    🔹 You can explore the dataset, visualize trends, 
+    predict car prices, and evaluate model performance.
     """)
