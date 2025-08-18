@@ -53,6 +53,21 @@ def load_data():
 model = load_model()
 df = load_data()
 
+# Encoding maps
+fuel_dict = {"Petrol": 0, "Diesel": 1, "CNG": 2}
+selling_dict = {"Dealer": 0, "Individual": 1}
+trans_dict = {"Manual": 0, "Automatic": 1}
+
+def encode_data(dataframe):
+    df_copy = dataframe.copy()
+    if "Fuel_Type" in df_copy:
+        df_copy["Fuel_Type"] = df_copy["Fuel_Type"].map(fuel_dict)
+    if "Selling_type" in df_copy:
+        df_copy["Selling_type"] = df_copy["Selling_type"].map(selling_dict)
+    if "Transmission" in df_copy:
+        df_copy["Transmission"] = df_copy["Transmission"].map(trans_dict)
+    return df_copy
+
 # -----------------------
 # Sidebar Navigation
 # -----------------------
@@ -86,11 +101,6 @@ elif page == "Predict":
     transmission = st.selectbox("Transmission", ["Manual", "Automatic"])
     owner = st.selectbox("Owner", [0, 1, 2, 3])
 
-    # Encoding
-    fuel_dict = {"Petrol": 0, "Diesel": 1, "CNG": 2}
-    selling_dict = {"Dealer": 0, "Individual": 1}
-    trans_dict = {"Manual": 0, "Automatic": 1}
-
     input_df = pd.DataFrame([{
         "Year": year,
         "Present_Price": present_price,
@@ -112,8 +122,10 @@ elif page == "Model Performance":
     st.header("📊 Model Performance")
 
     try:
-        X = df.drop(["Selling_Price", "Car_Name"], axis=1)
-        y = df["Selling_Price"]
+        df_encoded = encode_data(df)
+        X = df_encoded.drop(["Selling_Price", "Car_Name"], axis=1)
+        y = df_encoded["Selling_Price"]
+
         preds = model.predict(X)
         r2 = r2_score(y, preds)
         mse = mean_squared_error(y, preds)
