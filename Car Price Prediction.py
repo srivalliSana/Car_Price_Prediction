@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.cluster import KMeans
 
 st.set_page_config(page_title="Car Price Prediction", page_icon="🚗", layout="wide")
 
@@ -13,11 +14,12 @@ def load_data():
     return pd.read_csv("car data.csv")
 
 @st.cache_resource
-def load_model():
-    return joblib.load("car_price_prediction.pkl")
+def load_pipeline():
+    # This pipeline includes all preprocessing steps + trained model
+    return joblib.load("car_price_pipeline.pkl")
 
 df = load_data()
-model = load_model()
+pipeline = load_pipeline()
 
 tabs = st.tabs([
     "🏠 Home",
@@ -29,165 +31,186 @@ tabs = st.tabs([
     "🔮 Prediction"
 ])
 
+# HOME
 with tabs[0]:
     st.title("Car Price Prediction App 🚗")
-    st.image('https://images.unsplash.com/photo-1485463613374-7c9c9233c1a5?auto=format&fit=crop&w=800&q=80', use_container_width=True)
-    st.markdown("Explore, analyze, and predict used car prices. All tabs are error-safe.")
+    st.image(
+      'https://images.unsplash.com/photo-1485463613374-7c9c9233c1a5?auto=format&fit=crop&w=800&q=80',
+      use_container_width=True)
+    st.markdown(
+        "Explore, analyze, and predict used car prices easily through this interactive app."
+    )
 
+# DATA EXPLORER
 with tabs[1]:
     st.header("🔍 Data Explorer")
     try:
         st.dataframe(df, use_container_width=True)
-        brands = st.multiselect("Car Brand", sorted(df['Car_Name'].unique()))
-        years = st.slider("Year Range:", int(df['Year'].min()), int(df['Year'].max()),
-                         (int(df['Year'].min()), int(df['Year'].max())))
-        fuel = st.multiselect("Fuel Type", df['Fuel_Type'].unique())
-        filtered = df.copy()
-        if brands: filtered = filtered[filtered["Car_Name"].isin(brands)]
-        if years: filtered = filtered[(filtered["Year"] >= years) & (filtered["Year"] <= years[1])]
-        if fuel: filtered = filtered[filtered["Fuel_Type"].isin(fuel)]
-        st.write(f"Filtered rows: {len(filtered)}")
-        st.dataframe(filtered, use_container_width=True)
-    except Exception as ex:
-        st.error(f"Could not filter or show data: {ex}")
+        brands = st.multiselect("Filter by Car Brand:", sorted(df['Car_Name'].unique()))
+        years = st.slider("Year range:", int(df['Year'].min()), int(df['Year'].max()),
+                          value=(int(df['Year'].min()), int(df['Year'].max())))
+        fuels = st.multiselect("Fuel Type:", sorted(df['Fuel_Type'].unique()))
 
+        filtered_df = df.copy()
+        if brands:
+            filtered_df = filtered_df[filtered_df['Car_Name'].isin(brands)]
+        filtered_df = filtered_df[(filtered_df['Year'] >= years[0]) & (filtered_df['Year'] <= years[1])]
+        if fuels:
+            filtered_df = filtered_df[filtered_df['Fuel_Type'].isin(fuels)]
+
+        st.write(f"Filtered data has {len(filtered_df)} rows.")
+        st.dataframe(filtered_df, use_container_width=True)
+    except Exception as e:
+        st.error(f"Error displaying filtered data: {e}")
+
+# VISUAL ANALYSIS
 with tabs[2]:
     st.header("📊 Visual Analysis")
     try:
-        st.subheader("Selling Price by Fuel Type & Seller")
         fig, ax = plt.subplots()
-        sns.boxplot(x="Fuel_Type", y="Selling_Price", hue="Selling_type", data=df, ax=ax)
+        sns.boxplot(x='Fuel_Type', y='Selling_Price', hue='Selling_type', data=df, ax=ax)
+        st.subheader("Selling Price by Fuel Type & Seller Type")
         st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"Boxplot error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering boxplot: {e}")
 
     try:
-        st.subheader("Present Price vs. Selling Price Scatter (By Transmission)")
         fig, ax = plt.subplots()
-        sns.scatterplot(x="Present_Price", y="Selling_Price", style="Transmission", hue="Fuel_Type", data=df, ax=ax)
+        sns.scatterplot(x='Present_Price', y='Selling_Price', hue='Fuel_Type', style='Transmission', data=df, ax=ax)
+        st.subheader("Present Price vs Selling Price by Fuel Type & Transmission")
         st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"Scatterplot error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering scatterplot: {e}")
 
     try:
+        fig, ax = plt.subplots()
+        sns.histplot(df['Selling_Price'], bins=30, kde=True, color='skyblue', ax=ax)
         st.subheader("Selling Price Distribution")
-        fig, ax = plt.subplots()
-        sns.histplot(df["Selling_Price"], bins=30, kde=True, ax=ax, color="skyblue")
         st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"Histogram error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering selling price histogram: {e}")
 
     try:
-        st.subheader("Driven Kms Distribution")
         fig, ax = plt.subplots()
-        sns.histplot(df["Driven_kms"], bins=40, color="darkorange", ax=ax)
+        sns.histplot(df['Driven_kms'], bins=30, color='darkorange', ax=ax)
+        st.subheader("Driven Kms Distribution")
         st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"Histogram (kms) error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering driven kms histogram: {e}")
 
+# ADVANCED ANALYSIS
 with tabs[3]:
     st.header("📈 Advanced Analysis")
     try:
-        st.subheader("Correlation Matrix")
-        numeric = df.select_dtypes(include=[np.number])
-        corr = numeric.corr()
-        fig, ax = plt.subplots(figsize=(6,4))
+        numeric_df = df.select_dtypes(include=np.number)
+        corr = numeric_df.corr()
+        fig, ax = plt.subplots(figsize=(8,6))
         sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+        st.subheader("Correlation Matrix")
         st.pyplot(fig)
-        st.subheader("Top 5 Feature Correlations with Selling Price")
-        corr_target = corr['Selling_Price'].drop('Selling_Price').sort_values(key=abs, ascending=False).head(5)
-        st.bar_chart(corr_target)
-    except Exception as ex:
-        st.info(f"Correlation error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering correlation heatmap: {e}")
 
     try:
-        st.subheader("Outlier Detection: Selling Price vs. Present Price")
+        st.subheader("Top 5 correlations with Selling Price")
+        corr_target = corr['Selling_Price'].drop('Selling_Price').abs().sort_values(ascending=False).head(5)
+        st.bar_chart(corr_target)
+    except Exception as e:
+        st.error(f"Error showing top correlations: {e}")
+
+    try:
         Q1 = df['Selling_Price'].quantile(0.25)
         Q3 = df['Selling_Price'].quantile(0.75)
-        outlier_mask = (df['Selling_Price'] < Q1 - 1.5*(Q3-Q1)) | (df['Selling_Price'] > Q3 + 1.5*(Q3-Q1))
+        IQR = Q3 - Q1
+        outliers = df[(df['Selling_Price'] < Q1 - 1.5 * IQR) | (df['Selling_Price'] > Q3 + 1.5 * IQR)]
+
         fig, ax = plt.subplots()
-        ax.scatter(df[~outlier_mask]['Present_Price'], df[~outlier_mask]['Selling_Price'], label='Normal', alpha=0.6)
-        ax.scatter(df[outlier_mask]['Present_Price'], df[outlier_mask]['Selling_Price'], color='red', label='Outliers', alpha=0.7)
-        ax.legend(); ax.set_xlabel("Present Price"); ax.set_ylabel("Selling Price")
+        ax.scatter(df['Present_Price'], df['Selling_Price'], alpha=0.5, label='Normal')
+        ax.scatter(outliers['Present_Price'], outliers['Selling_Price'], color='red', label='Outliers')
+        ax.set_xlabel("Present Price")
+        ax.set_ylabel("Selling Price")
+        ax.legend()
+        st.subheader("Outlier Identification in Price vs Present Price")
         st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"Outlier plot error: {ex}")
+    except Exception as e:
+        st.error(f"Error rendering outlier detection: {e}")
 
     try:
-        from sklearn.cluster import KMeans
-        st.subheader("KMeans Clustering (2D: Present Price vs. Selling Price)")
-        cluster_data = df[['Present_Price', 'Selling_Price']].dropna()
-        kmeans = KMeans(n_clusters=3, random_state=0).fit(cluster_data)
-        cluster_data['cluster'] = kmeans.labels_
-        fig, ax = plt.subplots()
-        sns.scatterplot(
-            data=cluster_data, x='Present_Price', y='Selling_Price',
-            hue='cluster', palette='Set1', ax=ax
-        )
-        st.pyplot(fig)
-    except Exception as ex:
-        st.info(f"KMeans cluster plot error: {ex}")
+        cluster_data = df[['Present_Price','Selling_Price']].dropna()
+        kmeans = KMeans(n_clusters=3, random_state=42)
+        clusters = kmeans.fit_predict(cluster_data)
+        cluster_data['Cluster'] = clusters
 
+        fig, ax = plt.subplots()
+        sns.scatterplot(x='Present_Price', y='Selling_Price', hue='Cluster', data=cluster_data, palette='Set1', ax=ax)
+        st.subheader("KMeans Clustering on Present Price & Selling Price")
+        st.pyplot(fig)
+    except Exception as e:
+        st.error(f"Error rendering clustering: {e}")
+
+# FEATURE IMPORTANCE
 with tabs[4]:
     st.header("🤖 Feature Importance")
     try:
-        if hasattr(model, "feature_importances_"):
-            possible_features = [c for c in df.columns if c != 'Selling_Price']
-            imp = model.feature_importances_
-            if len(imp) != len(possible_features):
-                min_len = min(len(imp), len(possible_features))
-                feature_names, imp = possible_features[:min_len], imp[:min_len]
-            else:
-                feature_names = possible_features
-            imp_df = pd.DataFrame({"Feature": feature_names, "Importance": imp}).sort_values('Importance', ascending=False)
-            st.bar_chart(imp_df.set_index('Feature'))
-            st.dataframe(imp_df.reset_index(drop=True), use_container_width=True)
+        if hasattr(pipeline, "feature_importances_"):
+            features = list(df.drop(columns=['Selling_Price']).columns)
+            importances = pipeline.feature_importances_
+            if len(features) != len(importances):
+                min_len = min(len(features), len(importances))
+                features = features[:min_len]
+                importances = importances[:min_len]
+            fi_df = pd.DataFrame({'Feature': features, 'Importance': importances}).sort_values(by='Importance', ascending=False)
+            st.bar_chart(fi_df.set_index('Feature'))
+            st.dataframe(fi_df, use_container_width=True)
         else:
-            st.info("Feature importances only for tree-based models.")
+            st.info("Feature importance not available for this model type.")
     except Exception as e:
-        st.error(f"Feature importance error: {e}")
+        st.error(f"Error showing feature importances: {e}")
 
+# MODEL EVALUATION
 with tabs[5]:
     st.header("🧪 Model Evaluation")
     try:
-        X = df.drop(columns=["Selling_Price"])
+        X = df.drop(columns=['Selling_Price'])
         y = df['Selling_Price']
-        pred = model.predict(X)
-        st.metric("R²", r2_score(y, pred))
-        st.metric("MAE", mean_absolute_error(y, pred))
-        st.metric("RMSE", mean_squared_error(y, pred, squared=False))
+        preds = pipeline.predict(X)
+        st.metric("R² Score", f"{r2_score(y, preds):.3f}")
+        st.metric("Mean Absolute Error", f"{mean_absolute_error(y, preds):.3f}")
+        st.metric("Root Mean Squared Error", f"{mean_squared_error(y, preds, squared=False):.3f}")
 
         fig, ax = plt.subplots()
-        ax.scatter(y, pred, alpha=0.6)
-        ax.plot([y.min(), y.max()], [y.min(), y.max()], color='red', linestyle='--')
-        ax.set_xlabel("Actual"); ax.set_ylabel("Predicted")
-        ax.set_title("Actual vs. Predicted Selling Price")
+        ax.scatter(y, preds, alpha=0.6)
+        ax.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
+        ax.set_xlabel("Actual Selling Price")
+        ax.set_ylabel("Predicted Selling Price")
+        ax.set_title("Actual vs Predicted")
         st.pyplot(fig)
 
         fig, ax = plt.subplots()
-        residuals = y - pred
-        sns.histplot(residuals, bins=30, kde=True, color="slateblue", ax=ax)
+        residuals = y - preds
+        sns.histplot(residuals, bins=30, kde=True, color="purple", ax=ax)
         ax.set_title("Residuals Distribution")
         st.pyplot(fig)
     except Exception as e:
-        st.warning(f"Evaluation error: check that model input matches training features! Details: {e}")
+        st.error(f"Error during model evaluation: {e}")
 
+# PREDICTION TAB
 with tabs[6]:
     st.header("🔮 Predict Selling Price")
-    with st.form(key='predict_form'):
+    with st.form(key="predict_form"):
         col1, col2 = st.columns(2)
-        car_name = col1.selectbox('Car Name', sorted(df['Car_Name'].unique()))
-        year = col2.number_input('Year', min_value=1990, max_value=2025, value=2018)
-        present_price = col1.number_input('Present Price (Lakh)', min_value=0.0, value=5.0)
-        driven_kms = col2.number_input('Driven Kms', min_value=0, value=10000)
-        fuel_type = col1.selectbox('Fuel Type', sorted(df['Fuel_Type'].unique()))
-        selling_type = col2.selectbox('Seller Type', sorted(df['Selling_type'].unique()))
-        transmission = col1.selectbox('Transmission', sorted(df['Transmission'].unique()))
-        owner = col2.selectbox('Owner', sorted(df['Owner'].unique()))
-        submitted = st.form_submit_button('Predict Price')
+        car_name = col1.selectbox("Car Name", sorted(df['Car_Name'].unique()))
+        year = col2.number_input("Year", min_value=1990, max_value=2025, value=2017)
+        present_price = col1.number_input("Present Price (Lakh)", min_value=0.0, value=5.0)
+        driven_kms = col2.number_input("Driven Kms", min_value=0, value=10000)
+        fuel_type = col1.selectbox("Fuel Type", sorted(df['Fuel_Type'].unique()))
+        selling_type = col2.selectbox("Seller Type", sorted(df['Selling_type'].unique()))
+        transmission = col1.selectbox("Transmission", sorted(df['Transmission'].unique()))
+        owner = col2.selectbox("Owner", sorted(df['Owner'].unique()))
+        submitted = st.form_submit_button("Predict")
 
     if submitted:
-        input_dict = {
+        user_input = pd.DataFrame([{
             'Car_Name': car_name,
             'Year': year,
             'Present_Price': present_price,
@@ -196,10 +219,9 @@ with tabs[6]:
             'Selling_type': selling_type,
             'Transmission': transmission,
             'Owner': owner
-        }
-        input_df = pd.DataFrame([input_dict])
+        }])
         try:
-            prediction = model.predict(input_df)[0]
-            st.success(f"Estimated Selling Price: ₹ {prediction:.2f} Lakh")
-        except Exception as ex:
-            st.error(f"Prediction error: {ex}")
+            pred_price = pipeline.predict(user_input)[0]
+            st.success(f"Estimated Selling Price: ₹ {pred_price:.2f} Lakh")
+        except Exception as e:
+            st.error(f"Prediction failed. Confirm your input matches training data format. Error: {e}")
