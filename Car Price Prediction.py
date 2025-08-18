@@ -5,9 +5,10 @@ import joblib
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+# Page config
 st.set_page_config(page_title="Car Price Prediction", page_icon="🚗", layout="wide")
 
-# Load data & model
+# Load data and model
 @st.cache_data
 def load_data():
     return pd.read_csv("car data.csv")
@@ -19,7 +20,7 @@ def load_model():
 df = load_data()
 model = load_model()
 
-# Navigation bar with tabs
+# Tabs
 tabs = st.tabs(["🏠 Home", "📊 Data Trends", "🤖 Feature Importance", "🔮 Prediction"])
 
 # ----- HOME TAB -----
@@ -47,37 +48,37 @@ with tabs[1]:
     st.bar_chart(top_cars)
 
     st.subheader("Average Selling Price by Fuel Type")
-    avg_price_fuel = df.groupby('Fuel_Type')['Selling_Price'].mean()
+    avg_price_fuel = df.groupby('Fuel_Type')['Selling_Price'].mean().round(2)
     st.table(avg_price_fuel)
 
     st.subheader("Yearly Trends in Average Selling Price")
     fig, ax = plt.subplots()
     yearly_price = df.groupby('Year')['Selling_Price'].mean()
-    ax.plot(yearly_price.index, yearly_price.values, marker='o')
+    ax.plot(yearly_price.index, yearly_price.values, marker='o', linestyle='-', color='green')
     ax.set_xlabel("Year")
     ax.set_ylabel("Avg Selling Price (Lakh)")
+    ax.set_title("Yearly Average Selling Price")
     st.pyplot(fig)
 
     st.subheader("Distribution of Selling Prices")
     fig, ax = plt.subplots()
     sns.histplot(df["Selling_Price"], bins=30, color='skyblue', ax=ax)
+    ax.set_title("Selling Price Distribution")
     st.pyplot(fig)
 
 # ----- FEATURE IMPORTANCE TAB -----
 with tabs[2]:
     st.header("🤖 Feature Importance")
 
-    # Get model input feature names dynamically (assuming your model is pipeline or expects these columns)
     try:
-        # If your model is a pipeline, retrieve feature names from first step or preprocess accordingly
         feature_names = df.drop(columns=["Selling_Price"]).columns.tolist()
         importances = model.feature_importances_
         fi_df = pd.DataFrame({'Feature': feature_names, 'Importance': importances})
         fi_df = fi_df.sort_values('Importance', ascending=False)
         st.bar_chart(fi_df.set_index('Feature'))
-        st.write(fi_df)
+        st.dataframe(fi_df, use_container_width=True)
     except AttributeError:
-        st.info("Feature importance plot is available only for some models with attribute `feature_importances_`.")
+        st.warning("Feature importance is not available for this model type.")
 
 # ----- PREDICTION TAB -----
 with tabs[3]:
@@ -109,9 +110,10 @@ with tabs[3]:
         }
         input_df = pd.DataFrame([input_dict])
 
-        # IMPORTANT: if your model needs preprocessing (encoding or scaling),
-        # you must apply it here before prediction!
-        sell_price = model.predict(input_df)[0]
-
-        st.success(f"Estimated Selling Price: ₹ {sell_price:.2f} Lakh")
-        st.info("Note: Prediction accuracy depends on feature processing and your model quality.")
+        # Reminder: Apply preprocessing if needed
+        try:
+            sell_price = model.predict(input_df)[0]
+            st.success(f"Estimated Selling Price: ₹ {sell_price:.2f} Lakh")
+            st.info("Note: Prediction accuracy depends on feature processing and model quality.")
+        except Exception as e:
+            st.error(f"Prediction failed: {e}")
