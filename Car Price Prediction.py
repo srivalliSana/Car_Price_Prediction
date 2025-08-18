@@ -5,7 +5,6 @@ import pickle
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import r2_score, mean_squared_error
-from streamlit_option_menu import option_menu
 
 # =========================
 # Load model and dataset
@@ -23,34 +22,65 @@ model = load_model()
 
 st.set_page_config(page_title="Car Price Prediction App", layout="wide")
 
-st.title("🚗 Car Price Prediction App")
-st.markdown("Explore the dataset, visualize trends, and predict car prices using ML!")
+# =========================
+# Custom CSS Navbar
+# =========================
+st.markdown("""
+    <style>
+    .navbar {
+        display: flex;
+        justify-content: center;
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+    }
+    .nav-item {
+        margin: 0 20px;
+        text-align: center;
+        cursor: pointer;
+        color: #555;
+        font-size: 16px;
+        text-decoration: none;
+    }
+    .nav-item:hover {
+        color: #000;
+    }
+    .nav-icon {
+        font-size: 22px;
+        display: block;
+    }
+    .active {
+        color: #4CAF50;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# =========================
-# Icon Navigation Bar
-# =========================
-selected = option_menu(
-    menu_title=None,  # no title for navbar
-    options=["Dataset", "EDA", "Features", "Predict"],
-    icons=["table", "bar-chart", "list-task", "cash-coin"],  # bootstrap icons
-    orientation="horizontal",
-    styles={
-        "container": {"padding": "0!important", "background-color": "#fafafa"},
-        "icon": {"color": "blue", "font-size": "20px"},
-        "nav-link": {
-            "font-size": "16px",
-            "text-align": "center",
-            "margin": "0px",
-            "--hover-color": "#eee",
-        },
-        "nav-link-selected": {"background-color": "#4CAF50"},
-    },
-)
+# Navbar with icons (using emojis for simplicity)
+nav_items = {
+    "Dataset": "📊",
+    "EDA": "📈",
+    "Features": "⚡",
+    "Predict": "💰"
+}
+
+# Store selection in session_state
+if "page" not in st.session_state:
+    st.session_state.page = "Dataset"
+
+# Render Navbar
+cols = st.columns(len(nav_items))
+for i, (page, icon) in enumerate(nav_items.items()):
+    if cols[i].button(f"{icon}\n{page}"):
+        st.session_state.page = page
+
+st.title("🚗 Car Price Prediction App")
 
 # =========================
 # Dataset Overview
 # =========================
-if selected == "Dataset":
+if st.session_state.page == "Dataset":
     st.subheader("🔎 Dataset Preview")
     st.dataframe(df.head())
 
@@ -64,7 +94,7 @@ if selected == "Dataset":
 # =========================
 # Exploratory Data Analysis
 # =========================
-elif selected == "EDA":
+elif st.session_state.page == "EDA":
     st.subheader("📊 Exploratory Data Analysis")
 
     # Correlation heatmap
@@ -89,7 +119,7 @@ elif selected == "EDA":
 # =========================
 # Feature Importance
 # =========================
-elif selected == "Features":
+elif st.session_state.page == "Features":
     st.subheader("⚡ Feature Importance")
 
     if hasattr(model, "feature_importances_"):
@@ -107,7 +137,7 @@ elif selected == "Features":
 # =========================
 # Price Prediction
 # =========================
-elif selected == "Predict":
+elif st.session_state.page == "Predict":
     st.subheader("🎯 Predict Car Price")
 
     # Inputs
