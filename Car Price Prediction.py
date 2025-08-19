@@ -21,7 +21,7 @@ df = load_data()
 # =========================
 @st.cache_resource
 def load_model():
-    model_path = "car_price_prediction.pkl"
+    model_path = "Car Price Prediction"
     if os.path.exists(model_path):
         return joblib.load(model_path)
     return None
